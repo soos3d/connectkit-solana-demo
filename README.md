@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+<div align="center">
+  <a href="https://particle.network/">
+    <img src="https://i.imgur.com/xmdzXU4.png" />
+  </a>
+  <h3>
+    Particle Connect Solana Demo
+  </h3>
+</div>
 
-## Getting Started
+This example demonstrates integrating social and Web3 logins on the Solana blockchain using [Particle Connect](https://developers.particle.network/api-reference/connect/desktop/web)  and sending a transaction. 
 
-First, run the development server:
+Built using:
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Particle Connect 2.0**
+- **solana/web3.js**
+- **TypeScript**
+- **Tailwind CSS**
+
+## 🔑 Particle Connect
+
+**Particle Connect** enables a unified modal driving connection with social logins (through Particle Auth) and standard Web3 wallets, creating an equally accessible experience for Web3 natives and traditional consumers. Particle Connect is an all-in-one SDK capable of handling end-to-end onboarding and wallet connection.
+
+👉 Learn more about [Particle Connect](https://developers.particle.network/api-reference/connect/desktop/web).
+
+👉 Learn more about Particle Network: https://particle.network
+
+## 🛠️ Quickstart
+
+### Clone this repository
+
+```
+git clone https://github.com/Particle-Network/connect-solana-demo
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Access the app:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+cd solana-demo
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+### Install dependencies
 
-## Learn More
+```
+yarn
+```
+OR
+```
+npm install
+```
 
-To learn more about Next.js, take a look at the following resources:
+### Set environment variables
+This project requires several keys from Particle Network to be defined in `.env`. The following should be defined:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `NEXT_PUBLIC_PROJECT_ID`, the ID of the corresponding application in your [Particle Network dashboard](https://dashboard.particle.network/#/applications).
+- `NEXT_PUBLIC_CLIENT_KEY`, the ID of the corresponding project in your [Particle Network dashboard](https://dashboard.particle.network/#/applications).
+- `NEXT_PUBLIC_APP_ID`, the client key of the corresponding project in your [Particle Network dashboard](https://dashboard.particle.network/#/applications).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+### Start the project
+```
+npm run start
+```
+OR
+```
+yarn dev
+```
