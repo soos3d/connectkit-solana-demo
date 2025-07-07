@@ -12,8 +12,19 @@ import {
   SystemProgram,
   Transaction,
   LAMPORTS_PER_SOL,
+  ComputeBudgetProgram,
 } from "@solana/web3.js";
-import { useEffect, useState } from "react";
+import {
+  createAssociatedTokenAccountInstruction,
+  createTransferInstruction,
+  getAssociatedTokenAddress,
+} from "@solana/spl-token";
+import { useEffect, useState, useCallback } from "react";
+
+// USDC mint address on Solana mainnet-beta
+const USDC_MINT_ADDRESS = new PublicKey(
+  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+);
 
 const App = () => {
   const { address, isConnected, chainId, chain } = useAccount();
@@ -21,117 +32,229 @@ const App = () => {
   const [primaryWallet] = useWallets();
   const solanaWallet = primaryWallet?.getWalletClient<SolanaChain>();
 
-  // State to hold balance, recipient address, and transaction signature
+  // State for SOL
   const [balance, setBalance] = useState<number | null>(null);
-  const [recipientAddress, setRecipientAddress] = useState<string>("");
   const [transactionSignature, setTransactionSignature] = useState<
     string | null
   >(null);
 
-  const fetchBalance = async () => {
+  // State for USDC
+  const [usdcBalance, setUsdcBalance] = useState<number | null>(null);
+  const [usdcTransactionSignature, setUsdcTransactionSignature] = useState<
+    string | null
+  >(null);
+
+  // Common state
+  const [recipientAddress, setRecipientAddress] = useState<string>("");
+
+  const fetchSolBalance = useCallback(async () => {
     if (isConnected && solanaWallet && publicClient) {
       try {
         const balanceResponse = await publicClient.getBalance(
           solanaWallet.publicKey
         );
-
-        console.log("Balance in SOL:", balanceResponse / LAMPORTS_PER_SOL);
         setBalance(balanceResponse / LAMPORTS_PER_SOL);
       } catch (error) {
-        console.error("Failed to fetch balance:", error);
+        console.error("Failed to fetch SOL balance:", error);
       }
     }
-  };
+  }, [isConnected, solanaWallet, publicClient]);
 
-  // useEffect to fetch balance
+  const fetchUsdcBalance = useCallback(async () => {
+    if (isConnected && solanaWallet && publicClient) {
+      try {
+        const ata = await getAssociatedTokenAddress(
+          USDC_MINT_ADDRESS,
+          solanaWallet.publicKey
+        );
+        const accountInfo = await publicClient.getParsedAccountInfo(ata);
+
+        if (accountInfo.value) {
+          const tokenAmount = (accountInfo.value.data as any).parsed.info
+            .tokenAmount.uiAmount;
+          setUsdcBalance(tokenAmount);
+        } else {
+          setUsdcBalance(0);
+        }
+      } catch (error) {
+        console.error("Failed to fetch USDC balance:", error);
+        setUsdcBalance(0);
+      }
+    }
+  }, [isConnected, solanaWallet, publicClient]);
+
   useEffect(() => {
-    fetchBalance();
-  }, [isConnected, solanaWallet, publicClient, chainId]);
+    if (isConnected) {
+      fetchSolBalance();
+      fetchUsdcBalance();
+    }
+  }, [isConnected, fetchSolBalance, fetchUsdcBalance]);
 
-  const executeTx = async () => {
+  const executeSolTx = async () => {
+    if (!solanaWallet || !publicClient || !recipientAddress) return;
     try {
       const publicKey = solanaWallet.publicKey;
+      const tx = new Transaction()
+        .add(
+          ComputeBudgetProgram.setComputeUnitPrice({
+            microLamports: 100000,
+          })
+        )
+        .add(
+          SystemProgram.transfer({
+            fromPubkey: publicKey,
+            toPubkey: new PublicKey(recipientAddress),
+            lamports: 0.0001 * LAMPORTS_PER_SOL,
+          })
+        );
+      const { blockhash, lastValidBlockHeight } =
+        await publicClient.getLatestBlockhash("finalized");
+      tx.recentBlockhash = blockhash;
+      tx.lastValidBlockHeight = lastValidBlockHeight;
+      tx.feePayer = publicKey;
 
-      // Prepare the transaction object
-      const tx = new Transaction();
-      tx.add(
-        SystemProgram.transfer({
-          fromPubkey: publicKey,
-          toPubkey: new PublicKey(recipientAddress),
-          lamports: 0.0001 * LAMPORTS_PER_SOL, // Convert 0.1 SOL to lamports
-        })
-      );
-
-      if (publicClient) {
-        const { blockhash, lastValidBlockHeight } =
-          await publicClient.getLatestBlockhash({
-            commitment: "finalized",
-          });
-
-        tx.recentBlockhash = blockhash;
-        tx.lastValidBlockHeight = lastValidBlockHeight;
-        tx.feePayer = publicKey;
-
-        const transactionResponse = await solanaWallet.sendTransaction(tx);
-        console.log("Transaction sent:", transactionResponse);
-
-        // Set the transaction signature in state
-        setTransactionSignature(transactionResponse.signature);
-      } else {
-        console.error("Public client is not available.");
-      }
+      const transactionResponse = await solanaWallet.sendTransaction(tx);
+      setTransactionSignature(transactionResponse.signature);
     } catch (error) {
-      console.error("Failed to execute transaction:", error);
+      console.error("Failed to execute SOL transaction:", error);
     }
   };
 
-  // Standard ConnectButton utilization with inputs for recipient and amount
+  const executeUsdcTx = async () => {
+    if (!solanaWallet || !publicClient || !recipientAddress) return;
+    try {
+      const fromPublicKey = solanaWallet.publicKey;
+      const toPublicKey = new PublicKey(recipientAddress);
+
+      const fromAta = await getAssociatedTokenAddress(
+        USDC_MINT_ADDRESS,
+        fromPublicKey
+      );
+      const toAta = await getAssociatedTokenAddress(
+        USDC_MINT_ADDRESS,
+        toPublicKey,
+        true // Allow off-curve addresses for the owner (to send to programs/smart accounts)
+      );
+
+      const tx = new Transaction().add(
+        ComputeBudgetProgram.setComputeUnitPrice({
+          microLamports: 100000,
+        })
+      );
+      const toAtaAccount = await publicClient.getAccountInfo(toAta);
+
+      if (!toAtaAccount) {
+        tx.add(
+          createAssociatedTokenAccountInstruction(
+            fromPublicKey,
+            toAta,
+            toPublicKey,
+            USDC_MINT_ADDRESS
+          )
+        );
+      }
+
+      tx.add(
+        createTransferInstruction(
+          fromAta,
+          toAta,
+          fromPublicKey,
+          100000 // 0.1 USDC (6 decimals)
+        )
+      );
+
+      const { blockhash, lastValidBlockHeight } =
+        await publicClient.getLatestBlockhash("finalized");
+      tx.recentBlockhash = blockhash;
+      tx.lastValidBlockHeight = lastValidBlockHeight;
+      tx.feePayer = fromPublicKey;
+
+      const transactionResponse = await solanaWallet.sendTransaction(tx);
+      setUsdcTransactionSignature(transactionResponse.signature);
+    } catch (error) {
+      console.error("Failed to execute USDC transaction:", error);
+    }
+  };
+
   return (
     <div className="flex items-center justify-center min-h-screen">
-      <div className="text-center">
+      <div className="text-center p-4">
         <ConnectButton />
         {isConnected && (
           <>
-            <h2 className="mt-4">Address: {address}</h2>
-            <h2>Chain ID: {chainId}</h2>
-            {balance !== null && (
-              <div className="flex items-center justify-center space-x-2 mt-4">
+            <div className="mt-4">
+              <h2>Address: {address}</h2>
+              <h2>Chain ID: {chainId}</h2>
+            </div>
+
+            {/* SOL Balance and Actions */}
+            <div className="mt-4 p-4 border rounded-lg">
+              <div className="flex items-center justify-center space-x-2">
                 <h2>
-                  Balance: {balance} {chain?.nativeCurrency.symbol}
+                  Balance: {balance ?? "..."} {chain?.nativeCurrency.symbol}
                 </h2>
-                {/* Button to refresh the balance */}
                 <button
-                  onClick={fetchBalance}
+                  onClick={fetchSolBalance}
                   className="bg-purple-500 text-white p-2 rounded"
                 >
                   🔄
                 </button>
               </div>
-            )}
-            {/* Input for recipient address */}
-            <input
-              type="text"
-              placeholder="Recipient Address"
-              value={recipientAddress}
-              onChange={(e) => setRecipientAddress(e.target.value)}
-              className="border border-gray-300 rounded p-2 mt-4 w-full text-black"
-            />
-            {/* Button to execute transaction */}
-            <button
-              onClick={executeTx}
-              className="bg-purple-500 text-white p-2 rounded mt-4 w-full"
-            >
-              Send 0.0001 {chain?.nativeCurrency.symbol}
-            </button>
-            {/* Display transaction signature */}
-            {transactionSignature && (
-              <div className="mt-4">
-                <h2>Transaction Signature:</h2>
-                <p className="break-words text-blue-500">
-                  {transactionSignature}
-                </p>
+              {transactionSignature && (
+                <div className="mt-2">
+                  <h3>SOL Tx Signature:</h3>
+                  <p className="break-words text-blue-500">
+                    {transactionSignature}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* USDC Balance and Actions */}
+            <div className="mt-4 p-4 border rounded-lg">
+              <div className="flex items-center justify-center space-x-2">
+                <h2>Balance: {usdcBalance ?? "..."} USDC</h2>
+                <button
+                  onClick={fetchUsdcBalance}
+                  className="bg-blue-500 text-white p-2 rounded"
+                >
+                  🔄
+                </button>
               </div>
-            )}
+              {usdcTransactionSignature && (
+                <div className="mt-2">
+                  <h3>USDC Tx Signature:</h3>
+                  <p className="break-words text-green-500">
+                    {usdcTransactionSignature}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Common Controls */}
+            <div className="mt-4">
+              <input
+                type="text"
+                placeholder="Recipient Address"
+                value={recipientAddress}
+                onChange={(e) => setRecipientAddress(e.target.value)}
+                className="border border-gray-300 rounded p-2 w-full text-black"
+              />
+              <div className="flex space-x-2 mt-2">
+                <button
+                  onClick={executeSolTx}
+                  className="bg-purple-500 text-white p-2 rounded w-full"
+                >
+                  Send 0.0001 {chain?.nativeCurrency.symbol}
+                </button>
+                <button
+                  onClick={executeUsdcTx}
+                  className="bg-blue-500 text-white p-2 rounded w-full"
+                >
+                  Send 0.1 USDC
+                </button>
+              </div>
+            </div>
           </>
         )}
       </div>
