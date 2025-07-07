@@ -35,8 +35,8 @@ const App = () => {
           solanaWallet.publicKey
         );
 
-        console.log("Balance in SOL:", balanceResponse);
-        setBalance(balanceResponse);
+        console.log("Balance in SOL:", balanceResponse / LAMPORTS_PER_SOL);
+        setBalance(balanceResponse / LAMPORTS_PER_SOL);
       } catch (error) {
         console.error("Failed to fetch balance:", error);
       }
@@ -58,7 +58,7 @@ const App = () => {
         SystemProgram.transfer({
           fromPubkey: publicKey,
           toPubkey: new PublicKey(recipientAddress),
-          lamports: 0.1 * LAMPORTS_PER_SOL, // Convert 0.1 SOL to lamports
+          lamports: 0.0001 * LAMPORTS_PER_SOL, // Convert 0.1 SOL to lamports
         })
       );
 
@@ -121,7 +121,7 @@ const App = () => {
               onClick={executeTx}
               className="bg-purple-500 text-white p-2 rounded mt-4 w-full"
             >
-              Send 0.1 {chain?.nativeCurrency.symbol}
+              Send 0.0001 {chain?.nativeCurrency.symbol}
             </button>
             {/* Display transaction signature */}
             {transactionSignature && (
