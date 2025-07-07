@@ -35,9 +35,8 @@ const App = () => {
           solanaWallet.publicKey
         );
 
-        // Use lamportsToSol to convert balance to SOL
-        const balanceInSol = balanceResponse / LAMPORTS_PER_SOL;
-        setBalance(balanceInSol);
+        console.log("Balance in SOL:", balanceResponse);
+        setBalance(balanceResponse);
       } catch (error) {
         console.error("Failed to fetch balance:", error);
       }
