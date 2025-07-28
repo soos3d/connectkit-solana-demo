@@ -6,13 +6,35 @@ import {
   wallet,
   type EntryPosition,
 } from "@particle-network/connectkit/wallet";
-import { solana, solanaDevnet } from "@particle-network/connectkit/chains";
+import { solana, defineChain } from "@particle-network/connectkit/chains";
 import { authWalletConnectors } from "@particle-network/connectkit/auth";
 
 import {
   solanaWalletConnectors,
   injected as solaInjected,
 } from "@particle-network/connectkit/solana";
+
+const solanaChain = defineChain({
+  id: 101,
+  name: "Solana",
+  nativeCurrency: {
+    decimals: 18,
+    name: "Solana",
+    symbol: "SOL",
+  },
+  rpcUrls: {
+    default: {
+      http: [process.env.NEXT_PUBLIC_SOLANA_RPC_URL!],
+    },
+  },
+  blockExplorers: {
+    default: { name: "Explorer", url: "https://explorer.solana.com" },
+  },
+  testnet: false,
+  // custom: {
+  //   icon: "https://ICON_URL",
+  // },
+});
 
 const config = createConfig({
   projectId: process.env.NEXT_PUBLIC_PROJECT_ID!,
@@ -79,7 +101,7 @@ const config = createConfig({
       },
     }),
   ],
-  chains: [solana, solanaDevnet],
+  chains: [solanaChain],
 });
 
 // Wrap your application with this component.
