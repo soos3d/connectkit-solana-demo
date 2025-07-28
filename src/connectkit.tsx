@@ -6,7 +6,11 @@ import {
   wallet,
   type EntryPosition,
 } from "@particle-network/connectkit/wallet";
-import { solana, defineChain } from "@particle-network/connectkit/chains";
+import {
+  solana,
+  defineChain,
+  avalanche,
+} from "@particle-network/connectkit/chains";
 import { authWalletConnectors } from "@particle-network/connectkit/auth";
 
 import {
@@ -101,7 +105,7 @@ const config = createConfig({
       },
     }),
   ],
-  chains: [solanaChain],
+  chains: [solanaChain, avalanche],
 });
 
 // Wrap your application with this component.
