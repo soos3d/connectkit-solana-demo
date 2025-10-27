@@ -7,9 +7,9 @@ import {
   type EntryPosition,
 } from "@particle-network/connectkit/wallet";
 import {
-  solana,
   defineChain,
-  avalanche,
+  solanaDevnet,
+  Chain,
 } from "@particle-network/connectkit/chains";
 import { authWalletConnectors } from "@particle-network/connectkit/auth";
 
@@ -18,40 +18,41 @@ import {
   injected as solaInjected,
 } from "@particle-network/connectkit/solana";
 
-const solanaChain = defineChain({
-  id: 101,
-  name: "Solana",
-  nativeCurrency: {
-    decimals: 18,
-    name: "Solana",
-    symbol: "SOL",
-  },
-  rpcUrls: {
-    default: {
-      http: [process.env.NEXT_PUBLIC_SOLANA_RPC_URL!],
+const supportChains: Chain[] = [];
+// solana start
+supportChains.push(solanaDevnet);
+// solana end
+
+supportChains.push(
+  defineChain({
+    id: 101,
+    name: "Solana custom",
+    nativeCurrency: {
+      decimals: 18,
+      name: "Solana",
+      symbol: "SOL",
     },
-  },
-  blockExplorers: {
-    default: { name: "Explorer", url: "https://explorer.solana.com" },
-  },
-  testnet: false,
-  // custom: {
-  //   icon: "https://ICON_URL",
-  // },
-});
+    rpcUrls: {
+      default: {
+        http: [process.env.NEXT_PUBLIC_SOLANA_RPC_URL!],
+      },
+    },
+    blockExplorers: {
+      default: { name: "Explorer", url: "https://explorer.solana.com" },
+    },
+    testnet: false,
+    custom: {
+      // icon: "https://ICON_URL",
+    },
+  })
+);
 
 const config = createConfig({
   projectId: process.env.NEXT_PUBLIC_PROJECT_ID!,
   clientKey: process.env.NEXT_PUBLIC_CLIENT_KEY!,
   appId: process.env.NEXT_PUBLIC_APP_ID!,
   appearance: {
-    recommendedWallets: [
-      { walletId: "coinbaseWallet", label: "Popular" },
-      { walletId: "okxWallet", label: "none" },
-      { walletId: "phantom", label: "none" },
-      { walletId: "trustWallet", label: "none" },
-      { walletId: "bitKeep", label: "none" },
-    ],
+    recommendedWallets: [{ walletId: "phantom", label: "Popular" }],
     theme: {
       "--pcm-font-family": "'__Poppins_68bcaa', '__Poppins_Fallback_68bcaa'",
       "--pcm-rounded-sm": "4px",
@@ -105,7 +106,7 @@ const config = createConfig({
       },
     }),
   ],
-  chains: [solanaChain, avalanche],
+  chains: supportChains as unknown as readonly [Chain, ...Chain[]],
 });
 
 // Wrap your application with this component.

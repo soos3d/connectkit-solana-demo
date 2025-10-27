@@ -20,6 +20,7 @@ import {
   getAssociatedTokenAddress,
 } from "@solana/spl-token";
 import { useEffect, useState, useCallback } from "react";
+import bs58 from "bs58";
 
 // USDC mint address on Solana mainnet-beta
 const USDC_MINT_ADDRESS = new PublicKey(
@@ -41,6 +42,10 @@ const App = () => {
   // State for USDC
   const [usdcBalance, setUsdcBalance] = useState<number | null>(null);
   const [usdcTransactionSignature, setUsdcTransactionSignature] = useState<
+    string | null
+  >(null);
+
+  const [signMessageSignature, setSignMessageSignature] = useState<
     string | null
   >(null);
 
@@ -176,6 +181,18 @@ const App = () => {
     }
   };
 
+  const signMessage = async () => {
+    if (!solanaWallet) return;
+    try {
+      const message = new TextEncoder().encode("Particle signing a message");
+      const { signature } = await solanaWallet.signMessage(message);
+      console.log("Signature:", bs58.encode(signature));
+      setSignMessageSignature(bs58.encode(signature));
+    } catch (error) {
+      console.error("Failed to sign message:", error);
+    }
+  };
+
   return (
     <div className="flex items-center justify-center min-h-screen">
       <div className="text-center p-4">
@@ -226,6 +243,24 @@ const App = () => {
                   <h3>USDC Tx Signature:</h3>
                   <p className="break-words text-green-500">
                     {usdcTransactionSignature}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Sign Message */}
+            <div className="mt-4 p-4 border rounded-lg">
+              <button
+                onClick={signMessage}
+                className="bg-green-500 text-white p-2 rounded w-full"
+              >
+                Sign Message
+              </button>
+              {signMessageSignature && (
+                <div className="mt-2">
+                  <h3>Signed Message Signature:</h3>
+                  <p className="break-words text-purple-500">
+                    {signMessageSignature}
                   </p>
                 </div>
               )}
