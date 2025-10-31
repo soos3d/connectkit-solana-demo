@@ -21,6 +21,26 @@ import {
 } from "@solana/spl-token";
 import { useEffect, useState, useCallback } from "react";
 import bs58 from "bs58";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { CopyButton } from "@/components/CopyButton";
+import { ExplorerLink } from "@/components/ExplorerLink";
+import { Header } from "@/components/Header";
+import { getTransactionHistory } from "./actions";
+
+interface HistoryItem {
+  signature: string;
+  blockTime: number | null | undefined;
+}
 
 // USDC mint address on Solana mainnet-beta
 const USDC_MINT_ADDRESS = new PublicKey(
@@ -35,22 +55,22 @@ const App = () => {
 
   // State for SOL
   const [balance, setBalance] = useState<number | null>(null);
-  const [transactionSignature, setTransactionSignature] = useState<
-    string | null
-  >(null);
 
   // State for USDC
   const [usdcBalance, setUsdcBalance] = useState<number | null>(null);
-  const [usdcTransactionSignature, setUsdcTransactionSignature] = useState<
-    string | null
-  >(null);
 
-  const [signMessageSignature, setSignMessageSignature] = useState<
-    string | null
-  >(null);
+  // State for transaction history
+  const [history, setHistory] = useState<HistoryItem[]>([]);
 
   // Common state
   const [recipientAddress, setRecipientAddress] = useState<string>("");
+  const [solAmount, setSolAmount] = useState<string>("0.0001");
+  const [usdcAmount, setUsdcAmount] = useState<string>("0.1");
+
+  const truncateSignature = (sig: string) => {
+    if (!sig) return "";
+    return `${sig.substring(0, 10)}...${sig.substring(sig.length - 10)}`;
+  };
 
   const fetchSolBalance = useCallback(async () => {
     if (isConnected && solanaWallet && publicClient) {
@@ -88,12 +108,20 @@ const App = () => {
     }
   }, [isConnected, solanaWallet, publicClient]);
 
+  const fetchHistory = useCallback(async () => {
+    if (isConnected && address) {
+      const signatures = await getTransactionHistory(address);
+      setHistory(signatures);
+    }
+  }, [isConnected, address]);
+
   useEffect(() => {
     if (isConnected) {
       fetchSolBalance();
       fetchUsdcBalance();
+      fetchHistory();
     }
-  }, [isConnected, fetchSolBalance, fetchUsdcBalance]);
+  }, [isConnected, fetchSolBalance, fetchUsdcBalance, fetchHistory]);
 
   const executeSolTx = async () => {
     if (!solanaWallet || !publicClient || !recipientAddress) return;
@@ -109,7 +137,7 @@ const App = () => {
           SystemProgram.transfer({
             fromPubkey: publicKey,
             toPubkey: new PublicKey(recipientAddress),
-            lamports: 0.0001 * LAMPORTS_PER_SOL,
+            lamports: parseFloat(solAmount) * LAMPORTS_PER_SOL,
           })
         );
       const { blockhash, lastValidBlockHeight } =
@@ -118,8 +146,9 @@ const App = () => {
       tx.lastValidBlockHeight = lastValidBlockHeight;
       tx.feePayer = publicKey;
 
-      const transactionResponse = await solanaWallet.sendTransaction(tx);
-      setTransactionSignature(transactionResponse.signature);
+      await solanaWallet.sendTransaction(tx);
+      // Refresh history after transaction
+      setTimeout(fetchHistory, 1000);
     } catch (error) {
       console.error("Failed to execute SOL transaction:", error);
     }
@@ -164,7 +193,7 @@ const App = () => {
           fromAta,
           toAta,
           fromPublicKey,
-          100000 // 0.1 USDC (6 decimals)
+          parseFloat(usdcAmount) * 1000000 // 6 decimals for USDC
         )
       );
 
@@ -174,8 +203,9 @@ const App = () => {
       tx.lastValidBlockHeight = lastValidBlockHeight;
       tx.feePayer = fromPublicKey;
 
-      const transactionResponse = await solanaWallet.sendTransaction(tx);
-      setUsdcTransactionSignature(transactionResponse.signature);
+      await solanaWallet.sendTransaction(tx);
+      // Refresh history after transaction
+      setTimeout(fetchHistory, 1000);
     } catch (error) {
       console.error("Failed to execute USDC transaction:", error);
     }
@@ -185,112 +215,181 @@ const App = () => {
     if (!solanaWallet) return;
     try {
       const message = new TextEncoder().encode("Particle signing a message");
-      const { signature } = await solanaWallet.signMessage(message);
-      console.log("Signature:", bs58.encode(signature));
-      setSignMessageSignature(bs58.encode(signature));
+      await solanaWallet.signMessage(message);
+      // Refresh history after signing
+      setTimeout(fetchHistory, 1000);
     } catch (error) {
       console.error("Failed to sign message:", error);
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="text-center p-4">
-        <ConnectButton />
+    <div className="flex flex-col items-center min-h-screen p-4 sm:p-6 md:p-8 gap-4">
+      <div className="w-full max-w-7xl mx-auto">
+        <Header />
+        <div className="text-center my-8">
+          <p className="text-lg text-gray-400">
+            A demo application for making basic transfers and swaps on the Solana network.
+          </p>
+        </div>
         {isConnected && (
-          <>
-            <div className="mt-4">
-              <h2>Address: {address}</h2>
-              <h2>Chain ID: {chainId}</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Column */}
+            <div className="lg:col-span-1 flex flex-col gap-6">
+              {/* Wallet Info */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Wallet Information</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="truncate font-mono text-sm">{address}</span>
+                    <CopyButton textToCopy={address || ""} />
+                  </div>
+                  <p className="text-sm text-gray-500">Chain ID: {chainId}</p>
+                </CardContent>
+              </Card>
+
+              {/* Balances */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Wallet Balances</CardTitle>
+                  <CardDescription>SOL and USDC balances</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-lg">
+                        {balance ?? "..."} {chain?.nativeCurrency.symbol}
+                      </span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={fetchSolBalance}
+                    >
+                      🔄
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-lg">
+                        {usdcBalance ?? "..."} USDC
+                      </span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={fetchUsdcBalance}
+                    >
+                      🔄
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
-            {/* SOL Balance and Actions */}
-            <div className="mt-4 p-4 border rounded-lg">
-              <div className="flex items-center justify-center space-x-2">
-                <h2>
-                  Balance: {balance ?? "..."} {chain?.nativeCurrency.symbol}
-                </h2>
-                <button
-                  onClick={fetchSolBalance}
-                  className="bg-purple-500 text-white p-2 rounded"
-                >
-                  🔄
-                </button>
-              </div>
-              {transactionSignature && (
-                <div className="mt-2">
-                  <h3>SOL Tx Signature:</h3>
-                  <p className="break-words text-blue-500">
-                    {transactionSignature}
-                  </p>
-                </div>
-              )}
+            {/* Middle Column */}
+            <div className="lg:col-span-1 flex flex-col gap-6">
+              {/* Actions */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Actions</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid w-full items-center gap-1.5">
+                    <Label htmlFor="recipient">Recipient Address</Label>
+                    <Input
+                      id="recipient"
+                      type="text"
+                      placeholder="Enter recipient address"
+                      value={recipientAddress}
+                      onChange={(e) => setRecipientAddress(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="grid w-full items-center gap-1.5">
+                      <Label htmlFor="sol-amount">SOL Amount</Label>
+                      <Input
+                        id="sol-amount"
+                        type="number"
+                        placeholder="0.01"
+                        value={solAmount}
+                        onChange={(e) => setSolAmount(e.target.value)}
+                      />
+                    </div>
+                    <Button
+                      onClick={executeSolTx}
+                      disabled={!recipientAddress || !solAmount}
+                      className="w-full"
+                    >
+                      Send {chain?.nativeCurrency.symbol}
+                    </Button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="grid w-full items-center gap-1.5">
+                      <Label htmlFor="usdc-amount">USDC Amount</Label>
+                      <Input
+                        id="usdc-amount"
+                        type="number"
+                        placeholder="1.00"
+                        value={usdcAmount}
+                        onChange={(e) => setUsdcAmount(e.target.value)}
+                      />
+                    </div>
+                    <Button
+                      onClick={executeUsdcTx}
+                      disabled={!recipientAddress || !usdcAmount}
+                      className="w-full"
+                    >
+                      Send USDC
+                    </Button>
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <Button onClick={signMessage} className="w-full">
+                    Sign Message
+                  </Button>
+                </CardFooter>
+              </Card>
             </div>
 
-            {/* USDC Balance and Actions */}
-            <div className="mt-4 p-4 border rounded-lg">
-              <div className="flex items-center justify-center space-x-2">
-                <h2>Balance: {usdcBalance ?? "..."} USDC</h2>
-                <button
-                  onClick={fetchUsdcBalance}
-                  className="bg-blue-500 text-white p-2 rounded"
-                >
-                  🔄
-                </button>
-              </div>
-              {usdcTransactionSignature && (
-                <div className="mt-2">
-                  <h3>USDC Tx Signature:</h3>
-                  <p className="break-words text-green-500">
-                    {usdcTransactionSignature}
-                  </p>
-                </div>
-              )}
+            {/* Right Column */}
+            <div className="lg:col-span-1 flex flex-col gap-6">
+              {/* Transaction History */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Transaction History</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 text-sm text-gray-500">
+                  {history.length > 0 ? (
+                    history.map((item) => (
+                      <div key={item.signature} className="flex items-center justify-between">
+                        <div>
+                          <p className="break-words font-mono text-xs">
+                            {truncateSignature(item.signature)}
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            {item.blockTime
+                              ? new Date(item.blockTime * 1000).toLocaleString()
+                              : 'Date not available'}
+                          </p>
+                        </div>
+                        <div className="flex items-center">
+                          <CopyButton textToCopy={item.signature} />
+                          <ExplorerLink txSignature={item.signature} network={chain?.name} />
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p>No transactions yet.</p>
+                  )}
+                </CardContent>
+              </Card>
             </div>
-
-            {/* Sign Message */}
-            <div className="mt-4 p-4 border rounded-lg">
-              <button
-                onClick={signMessage}
-                className="bg-green-500 text-white p-2 rounded w-full"
-              >
-                Sign Message
-              </button>
-              {signMessageSignature && (
-                <div className="mt-2">
-                  <h3>Signed Message Signature:</h3>
-                  <p className="break-words text-purple-500">
-                    {signMessageSignature}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Common Controls */}
-            <div className="mt-4">
-              <input
-                type="text"
-                placeholder="Recipient Address"
-                value={recipientAddress}
-                onChange={(e) => setRecipientAddress(e.target.value)}
-                className="border border-gray-300 rounded p-2 w-full text-black"
-              />
-              <div className="flex space-x-2 mt-2">
-                <button
-                  onClick={executeSolTx}
-                  className="bg-purple-500 text-white p-2 rounded w-full"
-                >
-                  Send 0.0001 {chain?.nativeCurrency.symbol}
-                </button>
-                <button
-                  onClick={executeUsdcTx}
-                  className="bg-blue-500 text-white p-2 rounded w-full"
-                >
-                  Send 0.1 USDC
-                </button>
-              </div>
-            </div>
-          </>
+          </div>
         )}
       </div>
     </div>

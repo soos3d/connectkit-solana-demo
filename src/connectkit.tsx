@@ -20,13 +20,13 @@ import {
 
 const supportChains: Chain[] = [];
 // solana start
-supportChains.push(solanaDevnet);
+//supportChains.push(solanaDevnet);
 // solana end
 
 supportChains.push(
   defineChain({
     id: 101,
-    name: "Solana custom",
+    name: "Solana",
     nativeCurrency: {
       decimals: 18,
       name: "Solana",
@@ -100,7 +100,7 @@ const config = createConfig({
   plugins: [
     wallet({
       entryPosition: "bottom-right" as EntryPosition,
-      visible: true,
+      visible: false,
       customStyle: {
         fiatCoin: "USD",
       },

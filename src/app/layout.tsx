@@ -8,8 +8,8 @@ import { ParticleConnectkit } from "../connectkit";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Particle Connect 2.0 Quickstart demo",
-  description: "Demo showcasing a quickstart for Particle Connect 2.0",
+  title: "Particle Solana Widget",
+  description: "Solana Widget for Particle Wallets",
 };
 
 export default function RootLayout({
@@ -18,7 +18,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <body className={inter.className}>
         <ParticleConnectkit>{children}</ParticleConnectkit>
       </body>
